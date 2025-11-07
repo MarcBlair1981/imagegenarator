@@ -2,6 +2,10 @@
   "name": "netlify-image-processor",
   "version": "1.0.0",
   "description": "Image processing and storage with Netlify Function and Blobs",
+  
+  // 💥 CRITICAL FIX: This forces the ES Module (V2) runtime
+  "type": "module", 
+  
   "dependencies": {
     "sharp": "^0.33.0",
     "@netlify/blobs": "^4.0.0",
