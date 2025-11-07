@@ -3,39 +3,87 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Netlify Image Uploader</title>
+    <title>Image Style Processor</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        h1 { text-align: center; }
+        #upload-section, #processing-options { 
+            border: 1px solid #ccc; 
+            padding: 20px; 
+            margin-bottom: 20px; 
+            border-radius: 8px; 
+        }
+        #processing-options { 
+            display: none; /* Hidden until first successful upload */
+            background-color: #f9f9f9;
+        }
+        #processed-image { 
+            display: none; 
+            max-width: 100%; 
+            height: auto; 
+            margin-top: 20px; 
+            border: 1px solid #ddd;
+        }
+        button { 
+            padding: 10px 15px; 
+            background-color: #007bff; 
+            color: white; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover { background-color: #0056b3; }
+        input[type="file"], input[type="text"] {
+            display: block;
+            width: 100%;
+            margin-bottom: 10px;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+        .status-message { 
+            margin-top: 15px; 
+            padding: 10px; 
+            background-color: #e9ecef; 
+            border-radius: 4px; 
+        }
+    </style>
 </head>
 <body>
-    <h1>Upload and Process Image</h1>
-    <form id="uploadForm">
-        <input type="file" id="image-file" name="image-file" accept="image/*" required>
-        <button type="submit">Upload & Process</button>
-    </form>
-    <p id="message"></p>
-    <img id="processed-image" src="" alt="Processed Image" style="max-width: 100%; display: none;">
+
+    <h1>Netlify Image Style Processor</h1>
+
+    <div id="upload-section">
+        <h3>Step 1: Upload Image to Define Style (Original Process)</h3>
+        <form id="uploadForm">
+            <input type="file" id="file-input" name="image-file" accept="image/*" required>
+            <button type="submit">Upload & Process Style</button>
+        </form>
+    </div>
+
+    <div id="processing-options">
+        <h3>Step 2: Apply Saved Style to a New Image</h3>
+        <input type="text" id="style-key-input" placeholder="Style Key (Filled automatically)" readonly>
+        <input type="file" id="style-file" name="style-file" accept="image/*" required>
+        <button type="button" id="apply-style-button">Apply Style & Process New Image</button>
+    </div>
+
+    <div class="status-message" id="message"></div>
+    <img id="processed-image" alt="Processed Image">
 
     <script>
-        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const fileInput = document.getElementById('image-file');
-            const messageElement = document.getElementById('message');
-            const imageElement = document.getElementById('processed-image');
+        const endpoint = '/.netlify/functions/image-processor';
+        const messageElement = document.getElementById('message');
+        const imageElement = document.getElementById('processed-image');
+        const processingOptions = document.getElementById('processing-options');
+        const styleKeyInput = document.getElementById('style-key-input');
+        
+        let lastProcessedKey = '';
 
-            messageElement.textContent = 'Uploading and processing...';
-            imageElement.style.display = 'none';
-            
-            if (!fileInput.files.length) {
-                messageElement.textContent = 'Please select a file.';
-                return;
-            }
-
-            const formData = new FormData();
-            formData.append('image-file', fileInput.files[0]);
-
+        // Helper function to handle the fetch call and display results
+        async function fetchAndDisplay(formData) {
             try {
-                // Calls the deployed Netlify Function
-                const response = await fetch('/.netlify/functions/image-processor', {
+                const response = await fetch(endpoint, {
                     method: 'POST',
                     body: formData,
                 });
@@ -44,17 +92,66 @@
 
                 if (response.ok) {
                     messageElement.textContent = data.message + ' Key: ' + data.key;
-                    imageElement.src = data.url; // The image URL from Netlify Blobs
+                    imageElement.src = data.url;
                     imageElement.style.display = 'block';
+                    return data.key; // Return key on success
                 } else {
-                    messageElement.textContent = 'Error: ' + (data.error || 'Unknown error');
+                    messageElement.textContent = `Error: ${data.error} - ${data.detail || data.message}`;
+                    imageElement.style.display = 'none';
+                    return null;
                 }
-
             } catch (error) {
-                console.error(error);
-                messageElement.textContent = 'An error occurred during the request.';
+                messageElement.textContent = 'Network error: ' + error.message;
+                imageElement.style.display = 'none';
+                return null;
+            }
+        }
+
+        /* --- 1. Initial Style Upload Listener --- */
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const fileInput = document.getElementById('file-input');
+            if (!fileInput.files.length) {
+                messageElement.textContent = 'Please select a file to define the style.';
+                return;
+            }
+
+            messageElement.textContent = 'Processing initial image...';
+            
+            const formData = new FormData();
+            formData.append('image-file', fileInput.files[0]);
+
+            const newKey = await fetchAndDisplay(formData);
+            
+            if (newKey) {
+                lastProcessedKey = newKey; // Save the key
+                processingOptions.style.display = 'block'; // Show the next step
+                styleKeyInput.value = lastProcessedKey; // Pre-fill the key
             }
         });
+
+        /* --- 2. Apply Style Upload Listener --- */
+        document.getElementById('apply-style-button').addEventListener('click', async function() {
+            const styleKey = styleKeyInput.value;
+            const styleFileInput = document.getElementById('style-file');
+
+            if (!styleKey || !styleFileInput.files.length) {
+                messageElement.textContent = 'Please provide a style key and select a new file.';
+                return;
+            }
+
+            messageElement.textContent = 'Applying style and processing new image...';
+            imageElement.style.display = 'none';
+
+            const formData = new FormData();
+            formData.append('image-file', styleFileInput.files[0]);
+            // Pass the style key to the function as a form field
+            formData.append('style-key', styleKey); 
+
+            await fetchAndDisplay(formData);
+        });
     </script>
+
 </body>
 </html>
