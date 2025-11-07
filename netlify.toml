@@ -1,0 +1,9 @@
+[build]
+  # The directory where Netlify will find your static files (the frontend)
+  publish = "public" 
+  # The directory where Netlify will find your serverless functions
+  functions = "netlify/functions" 
+
+[functions]
+  # Use esbuild to correctly handle Node.js dependencies like Sharp
+  node_bundler = "esbuild"
