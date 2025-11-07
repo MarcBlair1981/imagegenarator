@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Netlify Image Uploader</title>
+</head>
+<body>
+    <h1>Upload and Process Image</h1>
+    <form id="uploadForm">
+        <input type="file" id="image-file" name="image-file" accept="image/*" required>
+        <button type="submit">Upload & Process</button>
+    </form>
+    <p id="message"></p>
+    <img id="processed-image" src="" alt="Processed Image" style="max-width: 100%; display: none;">
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const fileInput = document.getElementById('image-file');
+            const messageElement = document.getElementById('message');
+            const imageElement = document.getElementById('processed-image');
+
+            messageElement.textContent = 'Uploading and processing...';
+            imageElement.style.display = 'none';
+            
+            if (!fileInput.files.length) {
+                messageElement.textContent = 'Please select a file.';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('image-file', fileInput.files[0]);
+
+            try {
+                // Calls the deployed Netlify Function
+                const response = await fetch('/.netlify/functions/image-processor', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    messageElement.textContent = data.message + ' Key: ' + data.key;
+                    imageElement.src = data.url; // The image URL from Netlify Blobs
+                    imageElement.style.display = 'block';
+                } else {
+                    messageElement.textContent = 'Error: ' + (data.error || 'Unknown error');
+                }
+
+            } catch (error) {
+                console.error(error);
+                messageElement.textContent = 'An error occurred during the request.';
+            }
+        });
+    </script>
+</body>
+</html>
