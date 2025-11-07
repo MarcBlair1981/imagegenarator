@@ -3,15 +3,15 @@ import parser from "lambda-multipart-parser";
 import sharp from "sharp";
 import crypto from "node:crypto";
 
-// 1. Change the export to use the V2 default syntax
+// This is the new Netlify Functions V2 format
 export default async (req) => {
   if (req.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
   }
 
   try {
-    // 2. V2 functions use a standard Request object (req)
-    const result = await parser.parse(req); 
+    // V2 functions use a standard Request object (req)
+    const result = await parser.parse(req);
     const file = result.files.find((f) => f.fieldname === "image-file");
 
     if (!file) {
@@ -24,16 +24,16 @@ export default async (req) => {
     // The file content is a Buffer
     const fileContentBuffer = Buffer.from(file.content);
 
-    // 3. Process the image using Sharp
+    // Process the image using Sharp
     const processedBuffer = await sharp(fileContentBuffer)
       .resize(300)
       .webp()
       .toBuffer();
 
-    // 4. Get the Netlify Blobs store (V2 handles auth automatically)
+    // Get the Netlify Blobs store (V2 handles auth automatically)
     const imageStore = getStore("uploads");
 
-    // 5. Generate a unique key and save the processed image
+    // Generate a unique key and save the processed image
     const uniqueKey = crypto.randomBytes(16).toString("hex") + ".webp";
     await imageStore.set(uniqueKey, processedBuffer, {
       metadata: {
@@ -43,7 +43,7 @@ export default async (req) => {
       },
     });
 
-    // 6. Return success response (using standard Response object)
+    // Return success response (using standard Response object)
     const responseBody = JSON.stringify({
       message: "Image processed and saved!",
       key: uniqueKey,
